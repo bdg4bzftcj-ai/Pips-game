@@ -35,6 +35,9 @@ function encode(p) {
   return [p.rows + ',' + p.cols, grid.join(''), rules, doms, sol].join('|');
 }
 
+module.exports = { encode };
+if (require.main !== module) return;
+
 const days = [];
 const d0 = new Date(start + 'T00:00:00Z'), d1 = new Date(end + 'T00:00:00Z');
 const t0 = Date.now();

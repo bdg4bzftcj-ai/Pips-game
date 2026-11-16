@@ -322,7 +322,8 @@
     return board.regions[ri].cells.map(c => vals[c]).sort().join(',');
   }
   // Returns 'unique' | 'multiple' | 'unknown'; alt holds a differing solution's values.
-  function checkUnique(board, target, nodeLimit) {
+  function checkUnique(board, target, nodeLimit, strict) {
+    if (strict) return checkStrict(board, target, nodeLimit, strict);
     let alt = null;
     const R = board.regions.length;
     const targetKeys = [];
@@ -342,6 +343,44 @@
     return { status: 'unique' };
   }
 
+  // Strict uniqueness: the only freedom allowed is flipping a tile that lies inside one region.
+  // strict = { pairs: [[a, b]...] (the intended tile positions), cellRegion }
+  function checkStrict(board, target, nodeLimit, strict) {
+    let alt = null, diffCells = null;
+    const res = solve(board, (vals) => {
+      const bad = [];
+      for (const [a, b] of strict.pairs) {
+        if (vals[a] === target[a] && vals[b] === target[b]) continue;
+        if (strict.cellRegion[a] === strict.cellRegion[b] && vals[a] === target[b] && vals[b] === target[a]) continue;
+        if (vals[a] !== target[a]) bad.push(a);
+        if (vals[b] !== target[b]) bad.push(b);
+      }
+      if (!bad.length) return false;
+      alt = Array.from(vals); diffCells = bad; return true;
+    }, nodeLimit);
+    if (alt) return { status: 'multiple', alt, diff: [...new Set(diffCells.map(c => strict.cellRegion[c]))] };
+    if (res.aborted) return { status: 'unknown' };
+    return { status: 'unique' };
+  }
+
+  // A connected chunk of a region (about half of it) containing `start`, whose removal
+  // leaves the rest connected. Returns null if there is none.
+  function halfChunk(rng, regionCells, start, cells) {
+    const want = Math.max(1, Math.floor(regionCells.length / 2));
+    for (let tries = 0; tries < 12; tries++) {
+      const chunk = [start];
+      while (chunk.length < want) {
+        const opts = regionCells.filter(c => !chunk.includes(c) && chunk.some(x =>
+          Math.abs(cells[x][0] - cells[c][0]) + Math.abs(cells[x][1] - cells[c][1]) === 1));
+        if (!opts.length) break;
+        chunk.push(rng.pick(opts));
+      }
+      const rest = regionCells.filter(c => !chunk.includes(c));
+      if (rest.length && connected(rest, cells)) return chunk;
+    }
+    return null;
+  }
+
   function connected(list, cells) {
     if (list.length <= 1) return true;
     const set = new Set(list), seen = new Set([list[0]]), stack = [list[0]];
@@ -356,8 +395,9 @@
   }
 
   // ---------- main ----------
-  function generate(seed, difficulty) {
-    const cfg = CONFIG[difficulty] || CONFIG.medium;
+  function generate(seed, difficulty, opts) {
+    opts = opts || {};
+    const cfg = Object.assign({}, CONFIG[difficulty] || CONFIG.medium, opts.config || {});
     const rng = makeRng(seed + '|' + difficulty);
     for (let attempt = 0; attempt < 40; attempt++) {
       const k = rng.int(cfg.dominoes[0], cfg.dominoes[1]);
@@ -394,10 +434,15 @@
       });
 
       const board = { rows, cols, cells, regions, dominoes: doms };
+      let strictInfo = null;
+      if (opts.strict) {
+        strictInfo = { pairs: solPlacement.map(sp => [sp.a, sp.b]), cellRegion: new Array(cells.length) };
+        regions.forEach((rg, ri) => rg.cells.forEach(c => { strictInfo.cellRegion[c] = ri; }));
+      }
       let ok = false, splits = 0;
       const splitBudget = attempt < 6 ? cfg.maxSplits : Infinity;
       for (let iter = 0; iter < 60; iter++) {
-        const res = checkUnique(board, solution, cfg.nodeLimit || 250000);
+        const res = checkUnique(board, solution, cfg.nodeLimit || 250000, strictInfo);
         if (api.debug) api.debug.push(res.status);
         if (res.status === 'unique') { ok = true; break; }
         let pool = regions.map((_, i) => i);
@@ -426,14 +471,21 @@
           rest.splice(0, rest.length, ...rg.cells.filter(x => x !== alt));
           rest.cut = alt;
         }
-        const cutCell = rest.cut !== undefined ? rest.cut : cut;
-        rg.cells = rest.slice();
+        let cutCells = [rest.cut !== undefined ? rest.cut : cut];
+        if (opts.strict && rg.cells.length >= 4) {
+          const chunk = halfChunk(rng, rg.cells, cutCells[0], cells);
+          if (chunk) cutCells = chunk;
+        }
+        rg.cells = rg.cells.filter(c => !cutCells.includes(c));
         ladders[ri] = ruleOptions(rg.cells.map(c => solution[c]), rng);
         level[ri] = ladders[ri].length - 1;
         rg.rule = ladders[ri][level[ri]];
-        regions.push({ cells: [cutCell], rule: { type: 'sum', value: solution[cutCell] } });
-        ladders.push([regions[regions.length - 1].rule]);
-        level.push(0);
+        const lad = opts.strict ? ruleOptions(cutCells.map(c => solution[c]), rng)
+          : [{ type: 'sum', value: solution[cutCells[0]] }];
+        regions.push({ cells: cutCells, rule: lad[lad.length - 1] });
+        ladders.push(lad);
+        level.push(lad.length - 1);
+        if (strictInfo) regions.forEach((r2, i2) => r2.cells.forEach(c => { strictInfo.cellRegion[c] = i2; }));
       }
       if (!ok) continue;
 
@@ -482,7 +534,7 @@
     });
   }
 
-  const api = { generate, solve, regionStatus, makeRng, hashString, CONFIG };
+  const api = { generate, solve, regionStatus, makeRng, hashString, CONFIG, _int: { growShape, normalize, partition, connected, halfChunk, DIRS } };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.SpotlockGen = api;
 })(typeof self !== 'undefined' ? self : this);

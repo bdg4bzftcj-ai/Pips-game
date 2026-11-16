@@ -344,3 +344,5 @@ h2 { font-size: 1.25rem; font-weight: 700; }
 .bk-box .chip-btn { align-self: flex-start; }
 .bk-msg { margin: 0; font-weight: 700; color: var(--good); }
 .bk-msg.err { color: var(--bad); }
+
+.chip-btn.done { border-color: var(--good); color: var(--good); }

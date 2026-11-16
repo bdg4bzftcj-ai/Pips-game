@@ -14,7 +14,7 @@ const html = read('index.html');
 const body = html.slice(html.indexOf('<!--APP-->'), html.indexOf('<!--/APP-->') + 11);
 const fonts = html.match(/<link rel="stylesheet" href="https:\/\/fonts[^>]+>/)[0];
 const icon = 'data:image/png;base64,' + fs.readFileSync(path.join(www, 'icons/icon-192.png')).toString('base64');
-const scripts = ['js/generator.js', 'data/archive.js', 'js/app.js']
+const scripts = ['js/generator.js', 'data/archive.js', 'data/calibration.js', 'js/app.js']
   .map(f => '<script>\n' + read(f).replace(/<\/script/gi, '<\\/script') + '\n</script>').join('\n');
 const head = [
   '<title>Spotlock</title>',

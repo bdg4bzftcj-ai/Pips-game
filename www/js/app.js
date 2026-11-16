@@ -109,6 +109,11 @@
   function needsGeneration(iso) { const i = dayIndex(iso); return i < 0 || i >= ARCHIVE.days.length; }
 
   // ---------- game state ----------
+  const CALIB = self.SPOTLOCK_CALIB || {};
+  function puzzleId(o) {
+    return o.kind === 'calib' ? 'practice:calib:' + o.letter
+      : o.kind === 'daily' ? o.date + ':' + o.diff : 'practice:' + o.diff + ':' + o.seed;
+  }
   let S = null; // current game
   let cellSize = 52;
 
@@ -117,9 +122,10 @@
   function openPuzzle(opts) {
     // opts: {kind:'daily', date, diff} | {kind:'practice', diff, seed}
     const go = () => {
-      const str = opts.kind === 'daily' ? dailyString(opts.date, opts.diff)
+      const str = opts.kind === 'calib' ? CALIB[opts.letter].puzzle
+        : opts.kind === 'daily' ? dailyString(opts.date, opts.diff)
         : encode(GEN.generate(opts.seed, opts.diff));
-      const id = opts.kind === 'daily' ? opts.date + ':' + opts.diff : 'practice:' + opts.diff + ':' + opts.seed;
+      const id = puzzleId(opts);
       const pz = decode(str);
       const idxOf = new Map();
       pz.cells.forEach(([r, c], i) => idxOf.set(r * pz.cols + c, i));
@@ -369,7 +375,7 @@
       board.appendChild(b);
       return b;
     });
-    const label = S.opts.kind === 'daily'
+    const label = S.opts.kind === 'calib' ? 'Test puzzle ' + S.opts.letter : S.opts.kind === 'daily'
       ? DIFF_NAME[S.opts.diff] + ' · No. ' + (dayIndex(S.opts.date) + 1)
       : 'Practice · ' + DIFF_NAME[S.opts.diff];
     $('play-name').textContent = label;
@@ -711,6 +717,11 @@
 
   function nextPuzzle() {
     $('win').hidden = true;
+    if (S.opts.kind === 'calib') {
+      const next = Object.keys(CALIB).find(l => { const q = store.prog['practice:calib:' + l]; return !(q && (q.s || q.r)); });
+      if (next) openPuzzle({ kind: 'calib', letter: next, diff: 'hard' }); else goHome();
+      return;
+    }
     if (S.opts.kind === 'practice') { newPractice(S.opts.diff); return; }
     const isSolved = (iso, diff) => { const p = store.prog[iso + ':' + diff]; return p && (p.s || p.r); };
     let iso = S.opts.date;
@@ -794,6 +805,13 @@
       '<div class="stat"><b>' + st.bestHard + '</b><span>Best hard</span></div>';
     if (!calMonth) { const t = new Date(); calMonth = [t.getFullYear(), t.getMonth()]; }
     renderCalendar();
+    const letters = Object.keys(CALIB);
+    $('calib').hidden = !letters.length;
+    $('calib-btns').innerHTML = letters.map(l => {
+      const q = store.prog['practice:calib:' + l];
+      const st = q && q.s ? ' · ' + fmtTime(q.s) : q && q.r ? ' · shown' : q && (q.p || []).some(Boolean) ? ' · started' : '';
+      return '<button class="chip-btn' + (q && q.s ? ' done' : '') + '" data-calib="' + l + '">' + l + st + '</button>';
+    }).join('');
   }
 
   function puzzleState(p) {
@@ -921,6 +939,8 @@
   // ---------- wire up ----------
   document.addEventListener('click', (e) => {
     const card = e.target.closest('.diff-card');
+    const cal = e.target.closest('[data-calib]');
+    if (cal) { openPuzzle({ kind: 'calib', letter: cal.dataset.calib, diff: 'hard' }); return; }
     if (card) { openPuzzle({ kind: 'daily', date: card.dataset.date, diff: card.dataset.diff }); return; }
     const day = e.target.closest('.cal-day[data-day]');
     if (day && !day.disabled) { pickedDay = pickedDay === day.dataset.day ? null : day.dataset.day; renderCalendar(); return; }
@@ -1060,8 +1080,9 @@
   // Reopen the puzzle that was on screen when the app was last closed, unless it's finished.
   function resumeLast() {
     const o = store.last;
-    if (!o || !o.diff || !(o.kind === 'daily' ? o.date : o.seed)) return;
-    const id = o.kind === 'daily' ? o.date + ':' + o.diff : 'practice:' + o.diff + ':' + o.seed;
+    if (!o || !o.diff) return;
+    if (o.kind === 'calib' ? !CALIB[o.letter] : !(o.kind === 'daily' ? o.date : o.seed)) return;
+    const id = puzzleId(o);
     const p = store.prog[id];
     if (p && (p.s || p.r)) return;
     if (o.kind === 'daily' && (dayIndex(o.date) < 0 || o.date > todayISO())) return;
