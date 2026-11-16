@@ -275,6 +275,16 @@
     board.classList.remove('won');
     board.style.setProperty('--rows', pz.rows);
     board.style.setProperty('--cols', pz.cols);
+    // faint squares for the empty grid positions around the board
+    const present = new Set(pz.cells.map(([r, c]) => r * pz.cols + c));
+    for (let r = 0; r < pz.rows; r++) for (let c = 0; c < pz.cols; c++) {
+      if (present.has(r * pz.cols + c)) continue;
+      const g = document.createElement('div');
+      g.className = 'gridspot';
+      g.style.left = 'calc(' + c + ' * var(--cell))';
+      g.style.top = 'calc(' + r + ' * var(--cell))';
+      board.appendChild(g);
+    }
     const colors = colorRegions(pz);
     S.colors = colors;
     pz.cells.forEach(([r, c], i) => {
@@ -294,6 +304,10 @@
       if (!same(0)) sh.push('inset -2px 0 0 ' + ink);
       if (!same(1)) sh.push('inset 0 -2px 0 ' + ink);
       if (!same(2)) sh.push('inset 2px 0 0 ' + ink);
+      // thin grid lines between squares of the same region
+      const line = 'color-mix(in srgb, ' + ink + ' 38%, transparent)';
+      if (same(0)) sh.push('inset -1px 0 0 ' + line);
+      if (same(1)) sh.push('inset 0 -1px 0 ' + line);
       el.style.setProperty('--edges', sh.join(', ') || 'none');
       el.addEventListener('click', () => onCellTap(i));
       board.appendChild(el);
