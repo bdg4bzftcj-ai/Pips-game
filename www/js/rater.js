@@ -142,7 +142,9 @@
     while (!stalled && state.placed < D) {
       const f = single(state);
       if (f !== -1) {
-        steps.push(pendingLinks); pendingLinks = 0;
+        steps.push(pendingLinks);
+        if (opts && opts.trace) opts.trace.push({ tile: p.dominoes[cd[f]], a: ca[f], b: cb[f], va: cva[f], vb: cvb[f], links: pendingLinks });
+        pendingLinks = 0;
         apply(state, f);
         if (state.broken && state.placed < D) { stalled = true; break; }
         continue;
