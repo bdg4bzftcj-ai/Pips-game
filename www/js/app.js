@@ -930,6 +930,56 @@
     if (pr) { newPractice(pr.dataset.practice); return; }
     if (!$('menu').hidden && !e.target.closest('#menu') && !e.target.closest('#btn-menu')) $('menu').hidden = true;
   });
+  // ---------- backup ----------
+  const BK_PREFIX = 'SPOTLOCK1:';
+  function backupCode() {
+    const data = JSON.stringify({ prog: store.prog, practice: store.practice, settings: store.settings });
+    return BK_PREFIX + btoa(unescape(encodeURIComponent(data)));
+  }
+  function bkMessage(msg) { const m = $('bk-msg'); m.textContent = msg; m.hidden = !msg; }
+  $('bk-copy').addEventListener('click', () => {
+    if (S) persist();
+    const code = backupCode();
+    const showCode = () => {
+      $('bk-box').hidden = false; $('bk-apply').hidden = true;
+      $('bk-label').textContent = 'Your backup code. Select it all and copy it into Notes.';
+      $('bk-text').value = code; $('bk-text').focus(); $('bk-text').select();
+    };
+    try {
+      navigator.clipboard.writeText(code).then(() => {
+        $('bk-box').hidden = true;
+        bkMessage('Backup code copied. Paste it into Notes or anywhere safe.');
+      }, () => { showCode(); bkMessage(''); });
+    } catch (e) { showCode(); }
+  });
+  $('bk-show').addEventListener('click', () => {
+    $('bk-box').hidden = false; $('bk-apply').hidden = false;
+    $('bk-label').textContent = 'Paste your backup code';
+    $('bk-text').value = ''; $('bk-apply').textContent = 'Restore progress';
+    $('bk-apply').dataset.confirm = ''; bkMessage(''); $('bk-text').focus();
+  });
+  $('bk-apply').addEventListener('click', () => {
+    const raw = $('bk-text').value.trim();
+    let data = null;
+    try {
+      if (!raw.startsWith(BK_PREFIX)) throw new Error('prefix');
+      data = JSON.parse(decodeURIComponent(escape(atob(raw.slice(BK_PREFIX.length)))));
+      if (!data || typeof data.prog !== 'object') throw new Error('shape');
+    } catch (e) { bkMessage("That isn't a Spotlock backup code. Paste the whole code, starting with SPOTLOCK1:"); return; }
+    const btn = $('bk-apply');
+    if (Object.keys(store.prog).length && btn.dataset.confirm !== 'yes') {
+      btn.dataset.confirm = 'yes';
+      btn.textContent = 'Tap again to replace the progress on this device';
+      return;
+    }
+    store.prog = data.prog; store.practice = data.practice || {};
+    store.settings = Object.assign(store.settings, data.settings || {});
+    delete store.last; save(); applyTheme();
+    $('bk-box').hidden = true; btn.dataset.confirm = '';
+    bkMessage('Progress restored: ' + Object.values(store.prog).filter(p => p.s).length + ' solved puzzles.');
+    renderHome();
+  });
+
   $('month-prev').addEventListener('click', () => { let [y, m] = calMonth; m--; if (m < 0) { m = 11; y--; } calMonth = [y, m]; renderCalendar(); });
   $('month-next').addEventListener('click', () => { let [y, m] = calMonth; m++; if (m > 11) { m = 0; y++; } calMonth = [y, m]; renderCalendar(); });
   $('btn-back').addEventListener('click', goHome);

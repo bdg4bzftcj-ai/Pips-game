@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <title>Spotlock</title>
+<meta name="robots" content="noindex, nofollow">
 <meta name="description" content="A daily domino logic puzzle. Place every tile so each region's rule holds.">
 <meta name="theme-color" content="#1f3b4d">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -67,6 +68,21 @@
           <button class="chip-btn" data-practice="medium">New medium</button>
           <button class="chip-btn" data-practice="hard">New hard</button>
         </div>
+      </section>
+
+      <section class="practice backup">
+        <h2>Backup</h2>
+        <p class="muted">Your progress is saved on this device only. Copy a backup code into Notes to keep it safe, or paste one to bring your progress back.</p>
+        <div class="practice-btns">
+          <button class="chip-btn" id="bk-copy">Copy backup code</button>
+          <button class="chip-btn" id="bk-show">Restore from code</button>
+        </div>
+        <div class="bk-box" id="bk-box" hidden>
+          <label for="bk-text" id="bk-label">Paste your backup code</label>
+          <textarea id="bk-text" rows="3" spellcheck="false" autocomplete="off"></textarea>
+          <button class="chip-btn" id="bk-apply">Restore progress</button>
+        </div>
+        <p class="bk-msg" id="bk-msg" role="status" hidden></p>
       </section>
     </main>
   </section>
