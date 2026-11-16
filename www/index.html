@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Spotlock</title>
+<meta name="description" content="A daily domino logic puzzle. Place every tile so each region's rule holds.">
+<meta name="theme-color" content="#1f3b4d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Spotlock">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<!--APP-->
+<div id="app">
+  <!-- HOME -->
+  <section id="view-home" class="view">
+    <header class="topbar">
+      <div class="brand" aria-label="Spotlock">
+        <span class="brand-tile" aria-hidden="true"><i></i><i></i></span>
+        <span class="brand-word">Spotlock</span>
+      </div>
+      <div class="topbar-actions">
+        <button class="icon-btn" id="btn-help" aria-label="How to play">?</button>
+        <button class="icon-btn" id="btn-theme" aria-label="Switch theme">◐</button>
+      </div>
+    </header>
+
+    <main class="home">
+      <div class="today-head">
+        <p class="eyebrow" id="today-label">Today</p>
+        <h1 class="today-title" id="today-title">Puzzle No. 1</h1>
+      </div>
+      <div class="diff-cards" id="today-cards"></div>
+
+      <div class="stats" id="stats"></div>
+
+      <section class="archive">
+        <div class="archive-head">
+          <h2>Archive</h2>
+          <div class="month-nav">
+            <button class="icon-btn" id="month-prev" aria-label="Previous month">‹</button>
+            <span id="month-label">Month</span>
+            <button class="icon-btn" id="month-next" aria-label="Next month">›</button>
+          </div>
+        </div>
+        <div class="cal-legend"><span class="dot e"></span>Easy <span class="dot m"></span>Medium <span class="dot h"></span>Hard <span class="muted">· filled = solved</span></div>
+        <div class="calendar" id="calendar"></div>
+        <div class="day-pick" id="day-pick" hidden></div>
+      </section>
+
+      <section class="practice">
+        <h2>Practice</h2>
+        <p class="muted">Fresh puzzles that don't count toward your archive.</p>
+        <div class="practice-btns">
+          <button class="chip-btn" data-practice="easy">New easy</button>
+          <button class="chip-btn" data-practice="medium">New medium</button>
+          <button class="chip-btn" data-practice="hard">New hard</button>
+        </div>
+      </section>
+    </main>
+  </section>
+
+  <!-- PLAY -->
+  <section id="view-play" class="view" hidden>
+    <header class="topbar play-bar">
+      <button class="icon-btn" id="btn-back" aria-label="Back to puzzles">‹</button>
+      <div class="play-title">
+        <span id="play-name">Puzzle</span>
+        <span class="play-sub" id="play-sub"></span>
+      </div>
+      <span class="timer" id="timer">0:00</span>
+      <button class="icon-btn" id="btn-menu" aria-label="Puzzle options">⋯</button>
+    </header>
+    <div class="menu" id="menu" hidden>
+      <button id="m-reset">Start over</button>
+      <button id="m-reveal">Show solution</button>
+      <label class="menu-toggle"><input type="checkbox" id="m-live"> Flag broken rules as I go</label>
+    </div>
+    <main class="play">
+      <div class="board-wrap" id="board-wrap">
+        <div class="board" id="board"></div>
+      </div>
+      <div class="tray-wrap">
+        <div class="tray" id="tray"></div>
+        <div class="controls">
+          <button class="ctl" id="btn-undo">Undo</button>
+          <button class="ctl" id="btn-rotate">Rotate</button>
+          <button class="ctl" id="btn-clear">Clear board</button>
+        </div>
+        <p class="hint" id="hint">Drag a tile onto the board, or tap a tile then tap a square. Tap a placed tile to turn it.</p>
+      </div>
+    </main>
+  </section>
+
+  <!-- OVERLAYS -->
+  <div class="overlay" id="win" hidden>
+    <div class="sheet win-sheet" role="dialog" aria-labelledby="win-title">
+      <div class="win-tiles" aria-hidden="true"></div>
+      <h2 id="win-title">Locked in</h2>
+      <p id="win-text">Solved in 0:00</p>
+      <div class="sheet-btns">
+        <button class="primary" id="win-next">Next puzzle</button>
+        <button class="btn-ghost" id="win-home">All puzzles</button>
+        <button class="btn-ghost" id="win-stay">Look at board</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="help" hidden>
+    <div class="sheet help-sheet" role="dialog" aria-labelledby="help-title">
+      <h2 id="help-title">How to play</h2>
+      <p>Cover every square with the tiles in your tray. Each tile covers two neighbouring squares. Every tile gets used.</p>
+      <p>Coloured regions carry a rule. When the board is full, every rule has to hold.</p>
+      <ul class="rule-list">
+        <li><span class="tag">7</span> The spots in the region add up to exactly 7.</li>
+        <li><span class="tag">&lt;4</span> The total is less than 4.</li>
+        <li><span class="tag">&gt;9</span> The total is more than 9.</li>
+        <li><span class="tag">=</span> Every square shows the same number.</li>
+        <li><span class="tag">≠</span> Every square shows a different number.</li>
+        <li><span class="tag blank">·</span> Grey squares have no rule.</li>
+      </ul>
+      <p class="muted">A new easy, medium and hard puzzle comes out every day. Everything back to 1 January 2025 is in the archive.</p>
+      <div class="sheet-btns"><button class="primary" id="help-close">Play</button></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+  <div class="busy" id="busy" hidden><span></span> Laying out tiles…</div>
+</div>
+<!--/APP-->
+<script src="js/generator.js"></script>
+<script src="data/archive.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

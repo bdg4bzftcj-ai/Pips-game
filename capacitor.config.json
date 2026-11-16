@@ -1,0 +1,6 @@
+{
+  "appId": "app.spotlock.puzzle",
+  "appName": "Spotlock",
+  "webDir": "www",
+  "ios": { "contentInset": "never", "backgroundColor": "#1f3b4d" }
+}

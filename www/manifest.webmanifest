@@ -1,0 +1,16 @@
+{
+  "name": "Spotlock",
+  "short_name": "Spotlock",
+  "description": "A daily domino logic puzzle with a full archive.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1f3b4d",
+  "theme_color": "#1f3b4d",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
