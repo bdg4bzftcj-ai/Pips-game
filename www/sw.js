@@ -1,5 +1,5 @@
 // Offline cache for Spotlock. Bump VERSION whenever files change.
-const VERSION = 'spotlock-v5';
+const VERSION = 'spotlock-v6';
 const FILES = [
   './', 'index.html', 'css/app.css', 'js/generator.js', 'js/app.js', 'data/archive.js',
   'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png',

@@ -141,6 +141,7 @@
         locked: !!(prog && (prog.s || prog.r)),
         sel: -1, history: [], tStart: null,
       };
+      store.last = opts; save();
       showView('play');
       renderPlay();
       startTimer();
@@ -243,7 +244,7 @@
   let trayCols = 5;
   function trayLayout(width, cols, n) {
     const slot = Math.floor((width - 2 * TRAY_PAD - 2 - (cols - 1) * TRAY_GAP) / cols);
-    const t = Math.max(16, Math.min(40, Math.floor((slot - 4) / 2)));
+    const t = Math.max(16, Math.min(48, Math.floor((slot - 4) / 2)));
     const side = 2 * t + 4;
     const rows = Math.ceil((n + 1) / cols);
     return { cols, t, side, rows, h: rows * side + (rows - 1) * TRAY_GAP + 2 * TRAY_PAD };
@@ -257,7 +258,7 @@
     if (vw >= 900) {
       best = trayLayout(420, 5, n);
       const availW = Math.min(620, vw - 540), availH = vh - 160;
-      cellSize = Math.floor(Math.max(30, Math.min(68, availW / cols, availH / rows)));
+      cellSize = Math.floor(Math.max(30, Math.min(80, availW / cols, availH / rows)));
     } else {
       const play = document.querySelector('.play');
       const cs = play ? getComputedStyle(play) : null;
@@ -265,13 +266,13 @@
       const padX = cs ? parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) : 32;
       const bar = document.querySelector('#view-play .topbar');
       const barH = bar ? bar.getBoundingClientRect().height : 56;
-      const ctlH = 40, gaps = 2 * 8, wrapPad = 2 * 6;
+      const ctlH = 40, gaps = 2 * 8 + 6, wrapPad = 2 * 6;
       const trayW = Math.min(560, vw - padX);
       const availW = vw - padX - wrapPad;
       for (const c of [4, 5, 6, 7]) {
         const tl = trayLayout(trayW, c, n);
         const availH = vh - barH - padY - ctlH - gaps - wrapPad - tl.h;
-        const cell = Math.floor(Math.min(64, availW / cols, availH / rows));
+        const cell = Math.floor(Math.min(78, availW / cols, availH / rows));
         const score = Math.min(cell, tl.t * 1.4) + cell * 0.01;
         if (!best || score > best.score) best = Object.assign(tl, { cell, score });
       }
@@ -795,7 +796,62 @@
     renderCalendar();
   }
 
+  function puzzleState(p) {
+    if (!p) return 'new';
+    if (p.s) return 'done';
+    if (p.r) return 'shown';
+    if ((p.p || []).some(Boolean) || (p.e || 0) > 1500) return 'started';
+    return 'new';
+  }
+  function filterCounts() {
+    const c = { started: 0, done: 0 };
+    for (const [k, p] of Object.entries(store.prog)) {
+      if (k.startsWith('practice:')) continue;
+      const st = puzzleState(p);
+      if (st in c) c[st]++;
+    }
+    return c;
+  }
+  function renderFilter() {
+    const f = store.settings.filter || 'all';
+    const c = filterCounts();
+    const chip = (key, label) => '<button class="fchip' + (f === key ? ' on' : '') + '" data-filter="' + key + '" aria-pressed="' + (f === key) + '">' + label + '</button>';
+    $('filters').innerHTML = chip('all', 'Calendar') + chip('started', 'Started · ' + c.started) + chip('done', 'Completed · ' + c.done);
+    const listMode = f !== 'all';
+    $('month-nav').hidden = listMode;
+    $('cal-legend').hidden = listMode;
+    $('calendar').hidden = listMode;
+    $('puzzle-list').hidden = !listMode;
+    if (listMode) { $('day-pick').hidden = true; renderList(f); }
+  }
+  function tilesDown(p) { const n = (p.p || []).filter(Boolean).length; return n + (n === 1 ? ' tile' : ' tiles') + ' down'; }
+  function renderList(f) {
+    const rows = [];
+    for (const [k, p] of Object.entries(store.prog)) {
+      if (k.startsWith('practice:') || puzzleState(p) !== f) continue;
+      const [iso, diff] = k.split(':');
+      if (dayIndex(iso) < 0) continue;
+      rows.push({ iso, diff, p });
+    }
+    rows.sort((a, b) => (b.iso.localeCompare(a.iso)) || DIFFS.indexOf(a.diff) - DIFFS.indexOf(b.diff));
+    if (!rows.length) {
+      $('puzzle-list').innerHTML = '<p class="muted list-empty">' + (f === 'done'
+        ? 'Nothing completed yet. Puzzles you solve show up here.'
+        : 'No unfinished puzzles. Ones you start and leave show up here.') + '</p>';
+      return;
+    }
+    $('puzzle-list').innerHTML = rows.map(({ iso, diff, p }) => {
+      const t = new Date(isoToUTC(iso));
+      const when = t.getUTCDate() + ' ' + MONTHS[t.getUTCMonth()].slice(0, 3) + ' ' + t.getUTCFullYear();
+      const info = f === 'done' ? 'Solved · ' + fmtTime(p.s) : 'Left at ' + fmtTime(p.e || 0) + ' · ' + tilesDown(p);
+      return '<button class="diff-card list-card ' + (f === 'done' ? 'solved' : 'progress') + '" data-date="' + iso + '" data-diff="' + diff + '">' +
+        '<span class="lc-top"><span class="dname">' + DIFF_NAME[diff] + '</span><span class="lc-no">No. ' + (dayIndex(iso) + 1) + '</span></span>' +
+        '<span class="lc-date">' + when + '</span><span class="dstate">' + info + '</span></button>';
+    }).join('');
+  }
+
   function renderCalendar() {
+    renderFilter();
     const [y, m] = calMonth;
     const today = todayISO();
     $('month-label').textContent = MONTHS[m] + ' ' + y;
@@ -814,7 +870,8 @@
       if (before) { html += '<div class="cal-day empty"></div>'; continue; }
       const dots = DIFFS.map((diff, i) => {
         const p = store.prog[iso + ':' + diff];
-        return '<span class="dot ' + 'emh'[i] + (p && p.s ? ' on' : '') + '"></span>';
+        const st = puzzleState(p);
+        return '<span class="dot ' + 'emh'[i] + (st === 'done' ? ' on' : st === 'started' ? ' part' : '') + '"></span>';
       }).join('');
       const cls = 'cal-day' + (future ? ' future' : '') + (iso === today ? ' today' : '') + (iso === pickedDay ? ' sel' : '');
       html += '<button class="' + cls + '" data-day="' + iso + '"' + (future ? ' disabled' : '') +
@@ -841,6 +898,7 @@
   }
   function goHome() {
     stopTimer(); persist();
+    delete store.last; save();
     $('win').hidden = true;
     S = null;
     showView('home');
@@ -866,6 +924,8 @@
     if (card) { openPuzzle({ kind: 'daily', date: card.dataset.date, diff: card.dataset.diff }); return; }
     const day = e.target.closest('.cal-day[data-day]');
     if (day && !day.disabled) { pickedDay = pickedDay === day.dataset.day ? null : day.dataset.day; renderCalendar(); return; }
+    const fc = e.target.closest('[data-filter]');
+    if (fc) { store.settings.filter = fc.dataset.filter; save(); renderCalendar(); return; }
     const pr = e.target.closest('[data-practice]');
     if (pr) { newPractice(pr.dataset.practice); return; }
     if (!$('menu').hidden && !e.target.closest('#menu') && !e.target.closest('#btn-menu')) $('menu').hidden = true;
@@ -931,11 +991,25 @@
   let rz = null;
   window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (S && !$('view-play').hidden) { computeCellSize(); renderPieces(); } }, 120); });
   window.addEventListener('pagehide', () => { if (S) { stopTimer(); persist(); } });
+  window.addEventListener('blur', () => { if (S) persist(); });
+  document.addEventListener('freeze', () => { if (S) { stopTimer(); persist(); } });
 
   applyTheme();
   showView('home');
   renderHome();
   if (!store.settings.seenHelp) $('help').hidden = false;
+  else resumeLast();
+
+  // Reopen the puzzle that was on screen when the app was last closed, unless it's finished.
+  function resumeLast() {
+    const o = store.last;
+    if (!o || !o.diff || !(o.kind === 'daily' ? o.date : o.seed)) return;
+    const id = o.kind === 'daily' ? o.date + ':' + o.diff : 'practice:' + o.diff + ':' + o.seed;
+    const p = store.prog[id];
+    if (p && (p.s || p.r)) return;
+    if (o.kind === 'daily' && (dayIndex(o.date) < 0 || o.date > todayISO())) return;
+    openPuzzle(o);
+  }
 
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
     try { navigator.serviceWorker.register('sw.js').catch(() => {}); } catch (e) { /* not available here */ }

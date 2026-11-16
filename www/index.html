@@ -46,14 +46,16 @@
       <section class="archive">
         <div class="archive-head">
           <h2>Archive</h2>
-          <div class="month-nav">
+          <div class="month-nav" id="month-nav">
             <button class="icon-btn" id="month-prev" aria-label="Previous month">‹</button>
             <span id="month-label">Month</span>
             <button class="icon-btn" id="month-next" aria-label="Next month">›</button>
           </div>
         </div>
-        <div class="cal-legend"><span class="dot e"></span>Easy <span class="dot m"></span>Medium <span class="dot h"></span>Hard <span class="muted">· filled = solved</span></div>
+        <div class="filters" id="filters" role="group" aria-label="Show puzzles"></div>
+        <div class="cal-legend" id="cal-legend"><span class="dot e"></span>Easy <span class="dot m"></span>Medium <span class="dot h"></span>Hard <span class="muted">· filled = solved · half = started</span></div>
         <div class="calendar" id="calendar"></div>
+        <div class="puzzle-list" id="puzzle-list" hidden></div>
         <div class="day-pick" id="day-pick" hidden></div>
       </section>
 
