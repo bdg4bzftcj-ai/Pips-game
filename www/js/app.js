@@ -936,7 +936,7 @@
     const data = JSON.stringify({ prog: store.prog, practice: store.practice, settings: store.settings });
     return BK_PREFIX + btoa(unescape(encodeURIComponent(data)));
   }
-  function bkMessage(msg) { const m = $('bk-msg'); m.textContent = msg; m.hidden = !msg; }
+  function bkMessage(msg, isError) { const m = $('bk-msg'); m.textContent = msg; m.hidden = !msg; m.classList.toggle('err', !!isError); }
   $('bk-copy').addEventListener('click', () => {
     if (S) persist();
     const code = backupCode();
@@ -948,7 +948,9 @@
     try {
       navigator.clipboard.writeText(code).then(() => {
         $('bk-box').hidden = true;
-        bkMessage('Backup code copied. Paste it into Notes or anywhere safe.');
+        const n = Object.keys(store.prog).length;
+        bkMessage(n ? 'Backup code copied (' + n + (n === 1 ? ' puzzle' : ' puzzles') + '). Paste it into Notes or anywhere safe.'
+          : 'Copied, but there is no progress on this device yet, so the code is empty.', !n);
       }, () => { showCode(); bkMessage(''); });
     } catch (e) { showCode(); }
   });
@@ -959,13 +961,16 @@
     $('bk-apply').dataset.confirm = ''; bkMessage(''); $('bk-text').focus();
   });
   $('bk-apply').addEventListener('click', () => {
-    const raw = $('bk-text').value.trim();
+    // Tolerate autocorrect and pasting: any letter case for the prefix, stray spaces and line breaks.
+    const raw = $('bk-text').value.replace(/\s+/g, '');
     let data = null;
     try {
-      if (!raw.startsWith(BK_PREFIX)) throw new Error('prefix');
+      if (raw.slice(0, BK_PREFIX.length).toUpperCase() !== BK_PREFIX) throw new Error('prefix');
       data = JSON.parse(decodeURIComponent(escape(atob(raw.slice(BK_PREFIX.length)))));
       if (!data || typeof data.prog !== 'object') throw new Error('shape');
-    } catch (e) { bkMessage("That isn't a Spotlock backup code. Paste the whole code, starting with SPOTLOCK1:"); return; }
+    } catch (e) { bkMessage("That isn't a Spotlock backup code. Paste the whole code, starting with SPOTLOCK1:", true); return; }
+    const count = Object.keys(data.prog).length;
+    if (!count) { bkMessage('That backup code has no progress in it. Copy the code from the copy of Spotlock you played in.', true); return; }
     const btn = $('bk-apply');
     if (Object.keys(store.prog).length && btn.dataset.confirm !== 'yes') {
       btn.dataset.confirm = 'yes';
@@ -976,7 +981,9 @@
     store.settings = Object.assign(store.settings, data.settings || {});
     delete store.last; save(); applyTheme();
     $('bk-box').hidden = true; btn.dataset.confirm = '';
-    bkMessage('Progress restored: ' + Object.values(store.prog).filter(p => p.s).length + ' solved puzzles.');
+    const solvedN = Object.values(store.prog).filter(p => p.s).length;
+    const startedN = Object.keys(store.prog).length - solvedN;
+    bkMessage('Progress restored: ' + solvedN + ' solved, ' + startedN + ' started.');
     renderHome();
   });
 
