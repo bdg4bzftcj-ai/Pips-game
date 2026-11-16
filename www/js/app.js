@@ -207,8 +207,12 @@
 
   // ---------- rendering ----------
   const PIPS = { 0: [], 1: [4], 2: [2, 6], 3: [2, 4, 6], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8] };
-  function pipSlots(n, vertical) {
-    if (n === 6) return vertical ? [0, 3, 6, 2, 5, 8] : [0, 1, 2, 6, 7, 8];
+  // Layouts are chosen so a horizontal tile turned 90° lands exactly on the vertical layout,
+  // which keeps the end of the turn animation seamless.
+  function pipSlots(n, horizontal) {
+    if (n === 6) return horizontal ? [0, 3, 6, 2, 5, 8] : [0, 1, 2, 6, 7, 8];
+    if (n === 2) return horizontal ? [2, 6] : [0, 8];
+    if (n === 3) return horizontal ? [2, 4, 6] : [0, 4, 8];
     return PIPS[n] || [];
   }
   function makeDomino(d, dir) {
@@ -398,6 +402,50 @@
       ? (S.revealed ? 'This is the solution. Start over from the ⋯ menu to try again.' : 'Solved. Start over from the ⋯ menu to replay it.')
       : left === 0 ? 'Every tile is down. Check the rules marked in red.'
       : 'Drag a tile onto the board, or tap a tile then tap a square. Tap a placed tile to turn it. Drag tiles around the tray to arrange them.';
+    runMotion();
+  }
+
+  // ---------- motion ----------
+  // FLIP animation: after a re-render, start the tile at its old position/angle and ease it home.
+  const reduceMotion = window.matchMedia ? matchMedia('(prefers-reduced-motion: reduce)') : { matches: false };
+  let pendingMotion = [];
+  function tileEl(d) {
+    return document.querySelector('#board .domino[data-d="' + d + '"]') || document.querySelector('.tray .domino[data-d="' + d + '"]');
+  }
+  function queueMotion(d, fromRect, turnDeg, origin) {
+    if (!fromRect || reduceMotion.matches) return;
+    pendingMotion.push({ d, from: fromRect, turn: turnDeg || 0, origin });
+  }
+  function turnBetween(fromDir, toDir) { // clockwise quarter turns, shortest way
+    const k = ((toDir - fromDir) % 4 + 4) % 4;
+    return k === 3 ? -90 : k * 90;
+  }
+  function runMotion() {
+    const jobs = pendingMotion; pendingMotion = [];
+    for (const j of jobs) {
+      const el = tileEl(j.d);
+      if (!el || !el.animate) continue;
+      const to = el.getBoundingClientRect();
+      if (!to.width) continue;
+      const quarter = Math.abs(j.turn) % 180 === 90;
+      const scale = quarter ? j.from.width / to.height : j.from.width / to.width;
+      let startT, ease = 'cubic-bezier(.2, .9, .25, 1.15)', dur = 260;
+      if (j.turn && j.origin) {
+        // Pivot around a point (the tapped half's centre), given in viewport coords.
+        const ox = j.origin.x - to.left, oy = j.origin.y - to.top;
+        el.style.transformOrigin = ox + 'px ' + oy + 'px';
+        const dx = j.origin.x - (to.left + ox), dy = j.origin.y - (to.top + oy);
+        startT = 'translate(' + dx + 'px,' + dy + 'px) rotate(' + (-j.turn) + 'deg)';
+      } else {
+        const dx = (j.from.left + j.from.width / 2) - (to.left + to.width / 2);
+        const dy = (j.from.top + j.from.height / 2) - (to.top + to.height / 2);
+        startT = 'translate(' + dx + 'px,' + dy + 'px) rotate(' + (-j.turn) + 'deg) scale(' + (scale || 1) + ')';
+        if (!j.turn) { ease = 'cubic-bezier(.2, .8, .2, 1)'; dur = 200 + Math.min(160, Math.hypot(dx, dy) / 3); }
+      }
+      el.classList.add('moving');
+      const anim = el.animate([{ transform: startT }, { transform: 'none' }], { duration: dur, easing: ease });
+      anim.onfinish = anim.oncancel = () => { el.classList.remove('moving'); el.style.transformOrigin = ''; };
+    }
   }
 
   // ---------- interactions ----------
@@ -427,6 +475,8 @@
     for (const [a, dd] of tries) {
       if (a !== -1 && a !== undefined && fits(d, a, dd, occ)) {
         snapshot();
+        const src = tileEl(d);
+        queueMotion(d, src && src.getBoundingClientRect(), turnBetween(dir, dd));
         S.place[d] = [a, dd];
         S.sel = -1;
         changed();
@@ -447,6 +497,11 @@
       else { na = S.pz.nb[b][(nd + 2) % 4]; if (na === -1) continue; }
       if (fits(d, na, nd, occ)) {
         snapshot();
+        const pivotCell = $('board').querySelectorAll('.cell')[pivotHalf === 0 ? a : b];
+        const pr = pivotCell && pivotCell.getBoundingClientRect();
+        const cur = tileEl(d);
+        queueMotion(d, cur && cur.getBoundingClientRect(), k === 3 ? -90 : k * 90,
+          pr && { x: pr.left + pr.width / 2, y: pr.top + pr.height / 2 });
         S.place[d] = [na, nd];
         changed();
         return;
@@ -456,6 +511,8 @@
   }
 
   function rotateTray(d) {
+    const cur = tileEl(d);
+    queueMotion(d, cur && cur.getBoundingClientRect(), 90);
     S.trayDir[d] = (S.trayDir[d] + 1) % 4;
     persist();
     renderTray();
@@ -551,7 +608,9 @@
   function onUp(e) {
     if (!drag || e.pointerId !== drag.id) return;
     const dg = drag;
+    const ghostRect = dg.ghost ? dg.ghost.getBoundingClientRect() : null;
     endDrag();
+    if (dg.moved) queueMotion(dg.d, ghostRect, 0);
     if (!dg.moved) {
       if (dg.source === 'tray') {
         if (S.sel === dg.d) rotateTray(dg.d);

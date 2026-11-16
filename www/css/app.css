@@ -311,3 +311,7 @@ h2 { font-size: 1.25rem; font-weight: 700; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* tiles in motion float above their neighbours and badges */
+.domino.moving { z-index: 8; will-change: transform; }
+.tray .domino.moving { z-index: 8; }
