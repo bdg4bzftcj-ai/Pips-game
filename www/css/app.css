@@ -242,11 +242,12 @@ h2 { font-size: 1.25rem; font-weight: 700; }
 
 .tray-wrap { width: 100%; max-width: 560px; display: flex; flex-direction: column; gap: 14px; }
 .tray {
-  display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-content: flex-start;
-  min-height: calc(var(--t) * 2 + 12px); padding: 12px; border-radius: 14px; border: 1.5px dashed var(--line);
-  --t: min(44px, calc(var(--cell) * .82));
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px;
+  padding: 12px; border-radius: 14px; border: 1.5px dashed var(--line);
+  --t: 36px;
 }
-.tray .slot { display: grid; place-items: center; width: calc(var(--t) * 2 + 4px); height: calc(var(--t) * 2 + 4px); }
+.tray .slot { display: grid; place-items: center; height: calc(var(--t) * 2 + 6px); border-radius: 10px; transition: background .12s; }
+.tray .slot.drop-ok { background: color-mix(in srgb, var(--good) 22%, transparent); box-shadow: inset 0 0 0 2px var(--good); }
 .tray .domino { position: relative; --d: var(--t); }
 .tray .domino:not(.v) { width: calc(var(--t) * 2); height: var(--t); }
 .tray .domino.v { width: var(--t); height: calc(var(--t) * 2); }

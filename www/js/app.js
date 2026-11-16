@@ -134,6 +134,7 @@
         opts, id, pz,
         place: pz.dominoes.map((_, i) => (prog && prog.p && prog.p[i]) ? prog.p[i].slice() : null),
         trayDir: pz.dominoes.map((_, i) => (prog && prog.t) ? prog.t[i] || 0 : 0),
+        trayPos: pz.dominoes.map((_, i) => (prog && prog.q && prog.q[i] != null) ? prog.q[i] : i),
         elapsed: prog ? prog.e || 0 : 0,
         solved: !!(prog && prog.s),
         revealed: !!(prog && prog.r),
@@ -154,7 +155,7 @@
     if (!S) return;
     const prev = store.prog[S.id] || {};
     store.prog[S.id] = Object.assign(prev, {
-      p: S.place, t: S.trayDir, e: currentElapsed(),
+      p: S.place, t: S.trayDir, q: S.trayPos, e: currentElapsed(),
       s: prev.s || 0, r: S.revealed || false,
     });
     save();
@@ -354,28 +355,53 @@
     $('btn-rotate').disabled = S.locked;
   }
 
+  const TRAY_COLS = 4;
+  function slotCount() { return Math.ceil((S.pz.dominoes.length + 2) / TRAY_COLS) * TRAY_COLS; }
+  // Which tray slot each unplaced tile sits in; fixes collisions by moving a tile to the first free slot.
+  function settleTray() {
+    const n = slotCount(), taken = new Array(n).fill(-1);
+    const waiting = [];
+    S.pz.dominoes.forEach((_, d) => {
+      if (S.place[d]) return;
+      const q = S.trayPos[d];
+      if (q >= 0 && q < n && taken[q] === -1) taken[q] = d; else waiting.push(d);
+    });
+    for (const d of waiting) { const f = taken.indexOf(-1); taken[f] = d; S.trayPos[d] = f; }
+    return taken;
+  }
+  function sizeTray() {
+    const tray = $('tray');
+    const w = tray.clientWidth || 340;
+    const slotW = (w - 24 - (TRAY_COLS - 1) * 8) / TRAY_COLS;
+    tray.style.setProperty('--t', Math.max(18, Math.min(44, Math.floor((slotW - 6) / 2))) + 'px');
+  }
   function renderTray() {
     const tray = $('tray');
     tray.innerHTML = '';
+    sizeTray();
+    const taken = settleTray();
     let left = 0;
-    S.pz.dominoes.forEach((_, d) => {
+    taken.forEach((d, q) => {
       const slot = document.createElement('div');
       slot.className = 'slot';
-      const el = makeDomino(d, S.trayDir[d]);
-      if (S.place[d]) el.classList.add('used'); else left++;
-      if (S.sel === d) el.classList.add('sel');
-      attachPointer(el, d, 'tray');
-      slot.appendChild(el);
+      slot.dataset.q = q;
+      if (d !== -1) {
+        left++;
+        const el = makeDomino(d, S.trayDir[d]);
+        if (S.sel === d) el.classList.add('sel');
+        attachPointer(el, d, 'tray');
+        slot.appendChild(el);
+      }
       tray.appendChild(slot);
     });
     $('hint').textContent = S.locked
       ? (S.revealed ? 'This is the solution. Start over from the ⋯ menu to try again.' : 'Solved. Start over from the ⋯ menu to replay it.')
       : left === 0 ? 'Every tile is down. Check the rules marked in red.'
-      : 'Drag a tile onto the board, or tap a tile then tap a square. Tap a tile once it is down to turn it.';
+      : 'Drag a tile onto the board, or tap a tile then tap a square. Tap a placed tile to turn it. Drag tiles around the tray to arrange them.';
   }
 
   // ---------- interactions ----------
-  function snapshot() { S.history.push({ place: S.place.map(p => p && p.slice()), trayDir: S.trayDir.slice() }); if (S.history.length > 200) S.history.shift(); }
+  function snapshot() { S.history.push({ place: S.place.map(p => p && p.slice()), trayDir: S.trayDir.slice(), trayPos: S.trayPos.slice() }); if (S.history.length > 200) S.history.shift(); }
 
   function changed() {
     persist();
@@ -455,7 +481,21 @@
       el.addEventListener('pointercancel', onCancel);
     });
   }
-  function clearDropMarks() { document.querySelectorAll('.cell.drop-ok, .cell.drop-bad').forEach(c => c.classList.remove('drop-ok', 'drop-bad')); }
+  function clearDropMarks() { document.querySelectorAll('.cell.drop-ok, .cell.drop-bad, .slot.drop-ok').forEach(c => c.classList.remove('drop-ok', 'drop-bad')); }
+  // A tray slot under the pointer that this tile may move to (empty, or another tray tile to swap with).
+  function traySlotAt(x, y) {
+    const hit = document.elementFromPoint(x, y);
+    const slot = hit && hit.closest && hit.closest('.tray .slot');
+    if (!slot) return null;
+    const q = +slot.dataset.q;
+    const occupant = slot.querySelector('.domino');
+    if (occupant) {
+      const od = +occupant.dataset.d;
+      if (od === drag.d) return null;
+      if (drag.source !== 'tray') return null; // can't swap a board tile into an occupied slot
+    }
+    return { q, slot, swap: occupant ? +occupant.dataset.d : -1 };
+  }
   function onMove(e) {
     if (!drag || e.pointerId !== drag.id) return;
     const dx = e.clientX - drag.sx, dy = e.clientY - drag.sy;
@@ -482,6 +522,8 @@
     const col = Math.floor((left + hx - br.left) / cellSize), row = Math.floor((top + hy - br.top) / cellSize);
     clearDropMarks();
     drag.target = null;
+    drag.slot = traySlotAt(e.clientX, e.clientY);
+    if (drag.slot) { drag.slot.slot.classList.add('drop-ok'); return; }
     const wr = $('board-wrap').getBoundingClientRect();
     drag.overBoard = e.clientX >= wr.left && e.clientX <= wr.right && e.clientY >= wr.top && e.clientY <= wr.bottom;
     if (row < 0 || col < 0 || row >= S.pz.rows || col >= S.pz.cols) return;
@@ -522,7 +564,13 @@
       }
       return;
     }
-    if (dg.target) {
+    if (dg.slot) {
+      snapshot();
+      if (dg.slot.swap !== -1) S.trayPos[dg.slot.swap] = S.trayPos[dg.d];
+      S.trayPos[dg.d] = dg.slot.q;
+      if (dg.source === 'board') { S.trayDir[dg.d] = dg.dir; S.place[dg.d] = null; changed(); }
+      else { persist(); renderPieces(); }
+    } else if (dg.target) {
       snapshot();
       S.place[dg.d] = dg.target;
       changed();
@@ -748,7 +796,7 @@
   $('btn-undo').addEventListener('click', () => {
     if (!S.history.length || S.locked) return;
     const h = S.history.pop();
-    S.place = h.place; S.trayDir = h.trayDir; S.sel = -1;
+    S.place = h.place; S.trayDir = h.trayDir; if (h.trayPos) S.trayPos = h.trayPos; S.sel = -1;
     persist(); renderPieces();
   });
   $('btn-rotate').addEventListener('click', () => {
@@ -777,7 +825,7 @@
     if (e.key === 'r' || e.key === 'R') $('btn-rotate').click();
   });
   let rz = null;
-  window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (S && !$('view-play').hidden) { computeCellSize(); } }, 120); });
+  window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (S && !$('view-play').hidden) { computeCellSize(); renderTray(); } }, 120); });
   window.addEventListener('pagehide', () => { if (S) { stopTimer(); persist(); } });
 
   applyTheme();
