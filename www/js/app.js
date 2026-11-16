@@ -236,14 +236,53 @@
     return el;
   }
 
+  // Sizes the board and tray together so the whole play screen fits the window without scrolling.
+  // Tray spots are squares 4px longer than a tile, so a tile can sit in any orientation without
+  // touching its neighbours.
+  const TRAY_PAD = 6, TRAY_GAP = 3;
+  let trayCols = 5;
+  function trayLayout(width, cols, n) {
+    const slot = Math.floor((width - 2 * TRAY_PAD - 2 - (cols - 1) * TRAY_GAP) / cols);
+    const t = Math.max(16, Math.min(40, Math.floor((slot - 4) / 2)));
+    const side = 2 * t + 4;
+    const rows = Math.ceil((n + 1) / cols);
+    return { cols, t, side, rows, h: rows * side + (rows - 1) * TRAY_GAP + 2 * TRAY_PAD };
+  }
   function computeCellSize() {
     if (!S) return;
-    const { rows, cols } = S.pz;
-    const wide = window.innerWidth >= 900;
-    const availW = wide ? Math.min(620, window.innerWidth - 520) : window.innerWidth - 32 - 28;
-    const availH = wide ? window.innerHeight - 200 : window.innerHeight * 0.52;
-    cellSize = Math.floor(Math.max(30, Math.min(64, availW / cols, availH / rows)));
-    document.documentElement.style.setProperty('--cell', cellSize + 'px');
+    const { rows, cols } = S.pz, n = S.pz.dominoes.length;
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const root = document.documentElement;
+    let best;
+    if (vw >= 900) {
+      best = trayLayout(420, 5, n);
+      const availW = Math.min(620, vw - 540), availH = vh - 160;
+      cellSize = Math.floor(Math.max(30, Math.min(68, availW / cols, availH / rows)));
+    } else {
+      const play = document.querySelector('.play');
+      const cs = play ? getComputedStyle(play) : null;
+      const padY = cs ? parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom) : 20;
+      const padX = cs ? parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) : 32;
+      const bar = document.querySelector('#view-play .topbar');
+      const barH = bar ? bar.getBoundingClientRect().height : 56;
+      const ctlH = 40, gaps = 2 * 8, wrapPad = 2 * 6;
+      const trayW = Math.min(560, vw - padX);
+      const availW = vw - padX - wrapPad;
+      for (const c of [4, 5, 6, 7]) {
+        const tl = trayLayout(trayW, c, n);
+        const availH = vh - barH - padY - ctlH - gaps - wrapPad - tl.h;
+        const cell = Math.floor(Math.min(64, availW / cols, availH / rows));
+        const score = Math.min(cell, tl.t * 1.4) + cell * 0.01;
+        if (!best || score > best.score) best = Object.assign(tl, { cell, score });
+      }
+      cellSize = Math.max(26, best.cell);
+    }
+    trayCols = best.cols;
+    root.style.setProperty('--cell', cellSize + 'px');
+    const tray = $('tray');
+    tray.style.setProperty('--t', best.t + 'px');
+    tray.style.setProperty('--slot', best.side + 'px');
+    tray.style.setProperty('--tcols', best.cols);
   }
 
   function colorRegions(pz) {
@@ -373,8 +412,7 @@
     $('btn-rotate').disabled = S.locked;
   }
 
-  const TRAY_COLS = 4;
-  function slotCount() { return Math.ceil((S.pz.dominoes.length + 2) / TRAY_COLS) * TRAY_COLS; }
+  function slotCount() { return Math.ceil((S.pz.dominoes.length + 1) / trayCols) * trayCols; }
   // Which tray slot each unplaced tile sits in; fixes collisions by moving a tile to the first free slot.
   function settleTray() {
     const n = slotCount(), taken = new Array(n).fill(-1);
@@ -387,16 +425,9 @@
     for (const d of waiting) { const f = taken.indexOf(-1); taken[f] = d; S.trayPos[d] = f; }
     return taken;
   }
-  function sizeTray() {
-    const tray = $('tray');
-    const w = tray.clientWidth || 340;
-    const slotW = (w - 24 - (TRAY_COLS - 1) * 8) / TRAY_COLS;
-    tray.style.setProperty('--t', Math.max(18, Math.min(44, Math.floor((slotW - 6) / 2))) + 'px');
-  }
   function renderTray() {
     const tray = $('tray');
     tray.innerHTML = '';
-    sizeTray();
     const taken = settleTray();
     let left = 0;
     taken.forEach((d, q) => {
@@ -898,7 +929,7 @@
     if (e.key === 'r' || e.key === 'R') $('btn-rotate').click();
   });
   let rz = null;
-  window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (S && !$('view-play').hidden) { computeCellSize(); renderTray(); } }, 120); });
+  window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (S && !$('view-play').hidden) { computeCellSize(); renderPieces(); } }, 120); });
   window.addEventListener('pagehide', () => { if (S) { stopTimer(); persist(); } });
 
   applyTheme();
