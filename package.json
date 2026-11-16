@@ -5,7 +5,7 @@
   "description": "A daily domino logic puzzle with a full archive. Runs in any browser, installs as a PWA, and wraps as an iOS app with Capacitor.",
   "scripts": {
     "serve": "npx --yes http-server www -p 8080 -c-1",
-    "archive": "node scripts/build-archive.js 2025-01-01 2026-12-31",
+    "archive": "node scripts/build-archive.js 2025-01-01 2027-12-31",
     "single": "node scripts/build-single.js",
     "ios:add": "npx cap add ios",
     "ios:sync": "npx cap sync ios",

@@ -3,6 +3,7 @@
   'use strict';
 
   const GEN = self.SpotlockGen;
+  const RATER = self.SpotlockRater;
   const ARCHIVE = self.SPOTLOCK_ARCHIVE || { start: '2025-01-01', days: [] };
   const START = ARCHIVE.start;
   const DIFFS = ['easy', 'medium', 'hard'];
@@ -25,6 +26,21 @@
     }
   } catch (e) { /* storage unavailable: play without saving */ }
   function save() { try { localStorage.setItem(KEY, JSON.stringify(store)); } catch (e) { /* ignore */ } }
+  // When the puzzle set is rebuilt, boards saved for the old puzzles no longer fit. Keep the
+  // record of what was solved (and the time); drop half-finished boards and old practice puzzles.
+  function migrateProgress() {
+    const ver = (self.SPOTLOCK_ARCHIVE && self.SPOTLOCK_ARCHIVE.version) || 1;
+    if (store.archiveVersion === ver) return;
+    for (const k of Object.keys(store.prog)) {
+      const q = store.prog[k];
+      if (k.startsWith('practice:') || !q.s) delete store.prog[k];
+      else store.prog[k] = { s: q.s, e: q.s };
+    }
+    store.practice = {}; delete store.last;
+    store.archiveVersion = ver;
+    save();
+  }
+  migrateProgress();
 
   // ---------- dates ----------
   const pad = (n) => String(n).padStart(2, '0');
@@ -103,7 +119,7 @@
     const idx = dayIndex(iso), di = DIFFS.indexOf(diff);
     if (idx >= 0 && idx < ARCHIVE.days.length) return ARCHIVE.days[idx][di];
     const key = iso + ':' + diff;
-    if (!cache.has(key)) cache.set(key, encode(GEN.generate('spotlock:' + iso, diff)));
+    if (!cache.has(key)) cache.set(key, encode(RATER.generateFor('spotlock2:' + iso, diff)));
     return cache.get(key);
   }
   function needsGeneration(iso) { const i = dayIndex(iso); return i < 0 || i >= ARCHIVE.days.length; }
@@ -124,7 +140,7 @@
     const go = () => {
       const str = opts.kind === 'calib' ? CALIB[opts.letter].puzzle
         : opts.kind === 'daily' ? dailyString(opts.date, opts.diff)
-        : encode(GEN.generate(opts.seed, opts.diff));
+        : encode(RATER.generateFor(opts.seed, opts.diff));
       const id = puzzleId(opts);
       const pz = decode(str);
       const idxOf = new Map();
@@ -138,7 +154,10 @@
       const prog = progressFor(id);
       S = {
         opts, id, pz,
-        place: pz.dominoes.map((_, i) => (prog && prog.p && prog.p[i]) ? prog.p[i].slice() : null),
+        // a solved puzzle with no saved board (e.g. after the puzzle set was rebuilt) shows its answer
+        place: (prog && prog.s && !(prog.p || []).some(Boolean))
+          ? pz.solution.map(([a, b]) => [a, pz.nb[a].indexOf(b)])
+          : pz.dominoes.map((_, i) => (prog && prog.p && prog.p[i]) ? prog.p[i].slice() : null),
         trayDir: pz.dominoes.map((_, i) => (prog && prog.t) ? prog.t[i] || 0 : 0),
         trayPos: pz.dominoes.map((_, i) => (prog && prog.q && prog.q[i] != null) ? prog.q[i] : i),
         elapsed: prog ? prog.e || 0 : 0,
@@ -953,7 +972,7 @@
   // ---------- backup ----------
   const BK_PREFIX = 'SPOTLOCK1:';
   function backupCode() {
-    const data = JSON.stringify({ prog: store.prog, practice: store.practice, settings: store.settings });
+    const data = JSON.stringify({ prog: store.prog, practice: store.practice, settings: store.settings, archiveVersion: store.archiveVersion });
     return BK_PREFIX + btoa(unescape(encodeURIComponent(data)));
   }
   function bkMessage(msg, isError) { const m = $('bk-msg'); m.textContent = msg; m.hidden = !msg; m.classList.toggle('err', !!isError); }
@@ -998,6 +1017,7 @@
       return;
     }
     store.prog = data.prog; store.practice = data.practice || {};
+    store.archiveVersion = data.archiveVersion || 1; migrateProgress();
     store.settings = Object.assign(store.settings, data.settings || {});
     delete store.last; save(); applyTheme();
     $('bk-box').hidden = true; btn.dataset.confirm = '';

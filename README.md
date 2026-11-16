@@ -20,9 +20,10 @@ equal, or all different.
 www/                  the whole app (static files, no build step)
   index.html
   css/app.css
-  js/generator.js     puzzle generator + solver (also runs in Node)
+  js/generator.js     board shapes, regions, brute-force solver (also runs in Node)
+  js/rater.js         difficulty meter + the generator that builds puzzles to a target difficulty
   js/app.js           UI, archive, input, persistence
-  data/archive.js     pre-generated daily puzzles (2025-01-01 → 2026-12-31)
+  data/archive.js     pre-generated daily puzzles (2025-01-01 → 2027-12-31)
   sw.js, manifest.webmanifest, icons/
 scripts/
   build-archive.js    regenerates / extends data/archive.js
@@ -31,16 +32,28 @@ scripts/
 capacitor.config.json iOS wrapper config
 ```
 
-Dates after the end of the archive are generated on the fly with the same
-seeded generator, so the game never runs out. To bake in more years:
+### How puzzles are made
+
+`rater.js` contains a meter that solves a puzzle the way a person would: it places a
+tile when only one spot fits, and otherwise rules out placements that would leave a
+square or tile with nowhere to go, following at most a few forced moves. It never
+guesses. The generator only keeps puzzles the meter can finish, then merges lone
+squares and loosens rules while the puzzle stays solvable at its target depth.
+
+Each level has targets for tile count, how deep the hardest step is, how many tiles
+need thought, and how often the first tile is obvious (`LEVELS` in `rater.js`).
+
+Dates after the end of the archive are generated on the fly with the same seeded
+generator, so the game never runs out. To rebuild or extend the archive (slow; run
+slices in parallel with the `part` / `merge` modes described in the script):
 
 ```bash
 node scripts/build-archive.js 2025-01-01 2028-12-31
 ```
 
-Don't regenerate dates that people have already played. Changing the generator
-or the start date changes those puzzles, and saved progress would no longer
-match.
+Changing the generator changes every puzzle. Bump `VERSION` in
+`scripts/build-archive.js` when you do: the app then keeps solved records but clears
+half-finished boards, which would no longer match.
 
 ## Run it
 

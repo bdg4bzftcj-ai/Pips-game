@@ -22,7 +22,7 @@
   --r3: #f1dfa2; --i3: #94700f;
   --r4: #c7dcf5; --i4: #2e66a8;
   --r5: #f2c9db; --i5: #a8396d;
-  --rn: #e3e8eb; --in: #9aa8b0;
+  --rn: #f7f9fa; --in: #6b7c86;
 
   --font-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
   --font-body: "Atkinson Hyperlegible", "Segoe UI", system-ui, -apple-system, sans-serif;
@@ -36,7 +36,7 @@
     --shadow: 0 1px 0 rgba(0, 0, 0, .3), 0 8px 20px -8px rgba(0, 0, 0, .7);
     --r0: #18443f; --i0: #5fd0bc; --r1: #4e2a20; --i1: #ff9a7a; --r2: #33295a; --i2: #b8a4ff;
     --r3: #4a3c12; --i3: #f0c85a; --r4: #1d3557; --i4: #85b8f5; --r5: #4c2236; --i5: #f592bf;
-    --rn: #1f2f38; --in: #5c707b;
+    --rn: #31454f; --in: #9db0ba;
     color-scheme: dark;
   }
 }
@@ -47,7 +47,7 @@
   --shadow: 0 1px 0 rgba(0, 0, 0, .3), 0 8px 20px -8px rgba(0, 0, 0, .7);
   --r0: #18443f; --i0: #5fd0bc; --r1: #4e2a20; --i1: #ff9a7a; --r2: #33295a; --i2: #b8a4ff;
   --r3: #4a3c12; --i3: #f0c85a; --r4: #1d3557; --i4: #85b8f5; --r5: #4c2236; --i5: #f592bf;
-  --rn: #1f2f38; --in: #5c707b;
+  --rn: #31454f; --in: #9db0ba;
   color-scheme: dark;
 }
 

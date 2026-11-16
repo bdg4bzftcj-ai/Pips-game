@@ -109,7 +109,8 @@
   }
 
   // ---------- regions ----------
-  function partition(rng, cells, rows, cols, regionMax, solution) {
+  function partition(rng, cells, rows, cols, regionMax, solution, sameBias) {
+    if (sameBias === undefined) sameBias = 0.45;
     const idxOf = new Map();
     cells.forEach(([r, c], i) => idxOf.set(r * cols + c, i));
     const region = new Array(cells.length).fill(-1);
@@ -133,7 +134,7 @@
         }
         if (!frontier.length) break;
         const same = frontier.filter(f => solution[f] === solution[start]);
-        const n = same.length && rng.next() < 0.45 ? rng.pick(same) : rng.pick(frontier);
+        const n = same.length && rng.next() < sameBias ? rng.pick(same) : rng.pick(frontier);
         region[n] = rid; members.push(n);
       }
       rid++;
